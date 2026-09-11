@@ -19,9 +19,10 @@ endif()
 # adds it to the same archive as cbind — one library, already linked, and
 # naming it again here would only ask the linker for a second one that is not
 # there.
-set(LIBP2P_MODULE_LINK_LIBRARIES tinycbor)
 if(LOGOS_MODULE_BARE AND CMAKE_CROSSCOMPILING)
     set(LIBP2P_MODULE_LINK_LIBRARIES "")
+else()
+    set(LIBP2P_MODULE_LINK_LIBRARIES tinycbor)
 endif()
 
 logos_module(

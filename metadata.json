@@ -12,20 +12,17 @@
     "category": "protocol",
     "main": "libp2p_module_plugin",
     "dependencies": [],
-    "include": [
-        "libp2p.so",
-        "libp2p.dylib",
-        "libp2p.dll"
-    ],
+    "include": ["libp2p.so", "libp2p.dylib", "libp2p.dll"],
     "capabilities": [],
+
     "config": {
         "env": "LIBP2P_MODULE_CONFIG",
-        "description": "JSON config \u2014 inline, or a path to a JSON file \u2014 overlaid onto the default options when the module is loaded. Every key is optional; an omitted key keeps its default. The same schema is accepted at call time by createNode, which rebuilds the node before start.",
+        "description": "JSON config — inline, or a path to a JSON file — overlaid onto the default options when the module is loaded. Every key is optional; an omitted key keeps its default. The same schema is accepted at call time by createNode, which rebuilds the node before start.",
         "schema": {
-            "addrs": "array<multiaddr string> \u2014 listen addresses",
-            "bootstrapNodes": "array<{ peerId: string, addrs: array<multiaddr string> }> \u2014 DHT bootstrap peers",
-            "transport": "string \u2014 \"tcp\" | \"quic\" (\"quic-v1\" accepted as an alias for \"quic\")",
-            "privKey": "string \u2014 hex-encoded raw private key bytes; gives the node a stable peer identity across restarts. Omit to generate a fresh key on each start.",
+            "addrs": "array<multiaddr string> — listen addresses",
+            "bootstrapNodes": "array<{ peerId: string, addrs: array<multiaddr string> }> — DHT bootstrap peers",
+            "transport": "string — \"tcp\" | \"quic\" (\"quic-v1\" accepted as an alias for \"quic\")",
+            "privKey": "string — hex-encoded raw private key bytes; gives the node a stable peer identity across restarts. Omit to generate a fresh key on each start.",
             "maxConnections": "int",
             "maxInConnections": "int",
             "maxOutConnections": "int",
@@ -33,81 +30,51 @@
             "autonat": "bool",
             "autonatV2": "bool",
             "autonatV2Server": "bool",
-            "natPortMappingAuto": "bool \u2014 enable gateway port mapping with automatic protocol selection; mutually exclusive with every other port mapping mode",
-            "natPortMappingUpnp": "bool \u2014 enable gateway port mapping restricted to UPnP-IGD; mutually exclusive with every other port mapping mode",
-            "natPortMappingNatPmp": "bool \u2014 enable gateway port mapping restricted to PCP/NAT-PMP; mutually exclusive with every other port mapping mode",
-            "natExplicitIp": "string \u2014 announce this external IP instead of discovering a gateway mapping; mutually exclusive with every other port mapping mode",
-            "natDiscoveryTimeoutMs": "int \u2014 gateway discovery timeout; values <= 0 use the core default",
-            "natMappingTimeoutMs": "int \u2014 gateway mapping request timeout; values <= 0 use the core default",
-            "natReachabilityV1": "bool \u2014 enable NAT reachability probing with AutoNAT v1; mutually exclusive with natReachabilityV2, autonatV2, and hole punching",
-            "natReachabilityV2": "bool \u2014 enable NAT reachability probing with AutoNAT v2; mutually exclusive with v1 and hole punching",
-            "natReachabilityScheduleIntervalMs": "int \u2014 reachability probe interval; values <= 0 disable the scheduling override",
-            "natHolePunching": "bool \u2014 enable AutoNAT v1, AutoRelay, and DCUtR hole punching; mutually exclusive with natReachabilityV1, natReachabilityV2, and autonatV2",
-            "natHolePunchingMaxNumRelays": "int \u2014 relay reservation target for hole punching; values <= 0 use the core default",
-            "natHolePunchingScheduleIntervalMs": "int \u2014 hole-punch reachability probe interval; values <= 0 disable the scheduling override",
+            "natPortMappingAuto": "bool — enable gateway port mapping with automatic protocol selection; mutually exclusive with every other port mapping mode",
+            "natPortMappingUpnp": "bool — enable gateway port mapping restricted to UPnP-IGD; mutually exclusive with every other port mapping mode",
+            "natPortMappingNatPmp": "bool — enable gateway port mapping restricted to PCP/NAT-PMP; mutually exclusive with every other port mapping mode",
+            "natExplicitIp": "string — announce this external IP instead of discovering a gateway mapping; mutually exclusive with every other port mapping mode",
+            "natDiscoveryTimeoutMs": "int — gateway discovery timeout; values <= 0 use the core default",
+            "natMappingTimeoutMs": "int — gateway mapping request timeout; values <= 0 use the core default",
+            "natReachabilityV1": "bool — enable NAT reachability probing with AutoNAT v1; mutually exclusive with natReachabilityV2, autonatV2, and hole punching",
+            "natReachabilityV2": "bool — enable NAT reachability probing with AutoNAT v2; mutually exclusive with v1 and hole punching",
+            "natReachabilityScheduleIntervalMs": "int — reachability probe interval; values <= 0 disable the scheduling override",
+            "natHolePunching": "bool — enable AutoNAT v1, AutoRelay, and DCUtR hole punching; mutually exclusive with natReachabilityV1, natReachabilityV2, and autonatV2",
+            "natHolePunchingMaxNumRelays": "int — relay reservation target for hole punching; values <= 0 use the core default",
+            "natHolePunchingScheduleIntervalMs": "int — hole-punch reachability probe interval; values <= 0 disable the scheduling override",
             "circuitRelay": "bool",
             "circuitRelayClient": "bool",
             "gossipsubTriggerSelf": "bool",
             "mountGossipsub": "bool",
             "mountKad": "bool",
             "mountServiceDiscovery": "bool",
-            "gossipsubQueueMaxMessages": "int \u2014 messages held per topic for gossipsubNextMessage; default 1024. Once full the newest message is dropped and counted in libp2p_module_gossipsub_queue_dropped_total.",
-            "gossipsubQueueMaxBytes": "int \u2014 bytes held per topic for gossipsubNextMessage; default 4194304. Both bounds apply together, and a message larger than this bound never fits, so keep it above gossipsubMaxMessageSize. Set either bound to 0 to disable the queue for consumers that only read the gossipsubMessage event.",
-            "gossipsubMaxMessageSize": "int \u2014 largest GossipSub message accepted or sent, in bytes; default 0 keeps the core 1 MiB limit. The ceiling is MAX_GOSSIPSUB_MESSAGE_SIZE (67108864).",
-            "gossipsubOverheadRateLimitBytes": "int \u2014 per-peer budget of protocol-overhead bytes per interval; default 0 disables the limit. Needs gossipsubOverheadRateLimitIntervalMs.",
-            "gossipsubOverheadRateLimitIntervalMs": "int \u2014 refill interval of that budget, up to MAX_OVERHEAD_RATE_LIMIT_INTERVAL_MS. Needs gossipsubOverheadRateLimitBytes.",
-            "gossipsubDisconnectPeerAboveRateLimit": "bool \u2014 disconnect a peer that spends its budget; default false counts hits only. Needs a budget. Every gossipsub limit needs mountGossipsub."
+            "gossipsubQueueMaxMessages": "int — messages held per topic for gossipsubNextMessage; default 1024. Once full the newest message is dropped and counted in libp2p_module_gossipsub_queue_dropped_total.",
+            "gossipsubQueueMaxBytes": "int — bytes held per topic for gossipsubNextMessage; default 4194304. Both bounds apply together, and a message larger than this bound never fits, so keep it above gossipsubMaxMessageSize. Set either bound to 0 to disable the queue for consumers that only read the gossipsubMessage event.",
+            "gossipsubMaxMessageSize": "int — largest GossipSub message accepted or sent, in bytes; default 0 keeps the core 1 MiB limit. The ceiling is MAX_GOSSIPSUB_MESSAGE_SIZE (67108864).",
+            "gossipsubOverheadRateLimitBytes": "int — per-peer budget of protocol-overhead bytes per interval; default 0 disables the limit. Needs gossipsubOverheadRateLimitIntervalMs.",
+            "gossipsubOverheadRateLimitIntervalMs": "int — refill interval of that budget, up to MAX_OVERHEAD_RATE_LIMIT_INTERVAL_MS. Needs gossipsubOverheadRateLimitBytes.",
+            "gossipsubDisconnectPeerAboveRateLimit": "bool — disconnect a peer that spends its budget; default false counts hits only. Needs a budget. Every gossipsub limit needs mountGossipsub."
         }
     },
+
     "nix": {
         "packages": {
-            "runtime": [
-                "nlohmann_json"
-            ]
+            "runtime": ["nlohmann_json"]
         },
         "external_libraries": [
-            {
-                "name": "libp2p",
-                "vendor_path": "lib"
-            }
+            { "name": "libp2p", "vendor_path": "lib" }
         ],
         "cmake": {
-            "extra_include_dirs": [
-                "lib"
-            ]
+            "extra_include_dirs": ["lib"]
         },
+
         "platforms": [
-            {
-                "when": {
-                    "os": "linux",
-                    "abi": "gnu"
-                },
-                "packages": {
-                    "runtime": [
-                        "tinycbor"
-                    ]
-                }
-            },
-            {
-                "when": {
-                    "os": "darwin"
-                },
-                "packages": {
-                    "runtime": [
-                        "tinycbor"
-                    ]
-                }
-            },
-            {
-                "when": {
-                    "os": "windows"
-                },
-                "packages": {
-                    "runtime": [
-                        "tinycbor"
-                    ]
-                }
-            }
+            { "when": { "os": "linux", "abi": "gnu" },
+              "packages": { "runtime": ["tinycbor"] } },
+            { "when": { "os": "darwin" },
+              "packages": { "runtime": ["tinycbor"] } },
+            { "when": { "os": "windows" },
+              "packages": { "runtime": ["tinycbor"] } }
         ]
     }
 }
