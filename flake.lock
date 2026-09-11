@@ -21163,16 +21163,16 @@
         "rust-overlay": "rust-overlay_4"
       },
       "locked": {
-        "lastModified": 1789100627,
-        "narHash": "sha256-uDOMO3c9wRC8FtGkcCnry/YvYQHVuz8FWM/DwpLEXn4=",
+        "lastModified": 1789105314,
+        "narHash": "sha256-bcpviLzMUj/tPMZrMFtCR8MhapzuT1ySQR4rnVY9ba0=",
         "owner": "logos-fleet",
         "repo": "logos-module-builder",
-        "rev": "e94eb60f510d56970ba679490a97c8413f26ce19",
+        "rev": "8eba493d39fd06253625a7a5bcbcd232697326e6",
         "type": "github"
       },
       "original": {
         "owner": "logos-fleet",
-        "ref": "e94eb60",
+        "ref": "8eba493",
         "repo": "logos-module-builder",
         "type": "github"
       }
