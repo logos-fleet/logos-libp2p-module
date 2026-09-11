@@ -59,13 +59,22 @@
 
     "nix": {
         "packages": {
-            "runtime": ["nlohmann_json", "tinycbor"]
+            "runtime": ["nlohmann_json"]
         },
         "external_libraries": [
             { "name": "libp2p", "vendor_path": "lib" }
         ],
         "cmake": {
             "extra_include_dirs": ["lib"]
-        }
+        },
+
+        "platforms": [
+            { "when": { "os": "linux", "abi": "gnu" },
+              "packages": { "runtime": ["tinycbor"] } },
+            { "when": { "os": "darwin" },
+              "packages": { "runtime": ["tinycbor"] } },
+            { "when": { "os": "windows" },
+              "packages": { "runtime": ["tinycbor"] } }
+        ]
     }
 }
