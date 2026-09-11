@@ -8,7 +8,13 @@
   };
 
   inputs = {
-    logos-module-builder.url = "github:logos-co/logos-module-builder";
+    # A rev on the logos-fleet fork, not logos-co, and not a tag: the mobile
+    # Bare outputs this flake exposes below -- and the `mobilePackages` contract
+    # the libp2p externalLibInput answers -- are a property of the BUILDER, and
+    # only that line has them yet. `mobileTargets` is empty on a builder without
+    # them, so pointing this back at logos-co degrades the flake rather than
+    # breaking it.
+    logos-module-builder.url = "github:logos-fleet/logos-module-builder/e94eb60";
     libp2p.url = "github:vacp2p/nim-libp2p/master";
 
     openmetrics-module = {
@@ -46,6 +52,20 @@
         libp2p = {
           input = libp2pInputs;
           packages.default = "cbind";
+          # THE MOBILE HALF. nim-libp2p's own flake answers for five desktop
+          # systems and knows nothing about a phone, and logos-module-builder
+          # cannot recompile an external library for one either -- it comes from
+          # somewhere else entirely. So this flake cross-builds `cbind` itself,
+          # from the SAME locked input, and the builder stages the result over
+          # the build-platform image its `generate` step left in lib/. See
+          # nix/mobile-cbind.nix.
+          mobilePackages = { system, pkgs, buildSystem }:
+            import ./nix/mobile-cbind.nix {
+              inherit pkgs;
+              inherit (nixpkgs) lib;
+              libp2pSrc = inputs.libp2p;
+              target = system;
+            };
         };
       };
 
@@ -215,10 +235,28 @@
           };
         });
 
+      # The mobile pseudo-systems the builder adds to `packages` when its
+      # logos-nix carries the cross sets. Kept out of `systems` above for the
+      # reason the builder keeps them out of its own: a phone gets the Bare
+      # module and none of the other twenty outputs. `? ${t}` rather than a bare
+      # index, so a builder without them is simply a flake without mobile keys.
+      mobileTargets = builtins.filter (t: module.packages ? ${t})
+        [ "aarch64-ios" "aarch64-ios-simulator" "aarch64-android" ];
+
     in module // {
       apps = mergedApps;
       checks = module.checks or {};
-      packages = mergedPackages;
+      # nix build .#packages.aarch64-ios.bare -- libp2p_module and nim-libp2p's
+      # cbind, both cross-compiled, in one protocol-free image an iOS app or an
+      # APK loads.
+      packages = mergedPackages
+        // nixpkgs.lib.genAttrs mobileTargets (t: module.packages.${t});
+      # An Android derivation's `system` is its BUILD platform, so
+      # `packages.aarch64-android` is pinned to the builder's canonical one
+      # (x86_64-linux) and a Mac cannot realise it. This is the same artifact
+      # built from the other one:
+      #   nix build .#legacyPackages.aarch64-darwin.mobile.aarch64-android.bare
+      legacyPackages = module.legacyPackages or { };
       devShells = mergedDevShells;
     };
 }
