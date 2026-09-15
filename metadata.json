@@ -6,6 +6,7 @@
     "author": "Logos Core Team",
     "type": "core",
     "interface": "universal",
+    "platform": true,
     "codegen": {
         "impl_header": "plugin.h"
     },
