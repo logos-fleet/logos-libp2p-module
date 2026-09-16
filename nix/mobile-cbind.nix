@@ -30,7 +30,7 @@
 #
 # The rest of the headers are NOT reinstalled: they are source, identical for
 # every target, and `generate` already staged the build platform's copy.
-{ lib, pkgs, libp2pSrc, target }:
+{ lib, pkgs, libp2pSrc, patches ? [ ], target }:
 
 let
   # nim, nimble and the dependency sources RUN on the builder; only the code
@@ -63,6 +63,9 @@ let
     pname = "nim-libp2p-cbind-${target}";
     version = "dev";
     src = libp2pSrc;
+    # The same nim-libp2p patches the desktop `cbind` gets, or the phone would
+    # build a library whose FFI struct does not match the generated header.
+    inherit patches;
 
     nativeBuildInputs = [ bp.nim-2_2 bp.git bp.nimble ];
 

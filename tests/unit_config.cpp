@@ -380,3 +380,48 @@ LOGOS_TEST(from_json_reports_error_reason) {
     LOGOS_ASSERT_TRUE(ok);
     LOGOS_ASSERT_TRUE(err.empty());
 }
+
+// logos-workspace#206: which screen nim-libp2p runs over the announced set.
+
+LOGOS_TEST(parse_announced_address_policy_known_values) {
+    auto unfiltered = json::parse(R"({"announcedAddressPolicy": "unfiltered"})");
+    auto dialable = json::parse(R"({"announcedAddressPolicy": "dialable"})");
+    auto routable = json::parse(R"({"announcedAddressPolicy": "routable"})");
+    LOGOS_ASSERT_EQ(cfg::parseAnnouncedAddressPolicy(unfiltered, ANNOUNCED_ADDRESS_POLICY_ROUTABLE),
+                    ANNOUNCED_ADDRESS_POLICY_UNFILTERED);
+    LOGOS_ASSERT_EQ(cfg::parseAnnouncedAddressPolicy(dialable, ANNOUNCED_ADDRESS_POLICY_ROUTABLE),
+                    ANNOUNCED_ADDRESS_POLICY_DIALABLE);
+    LOGOS_ASSERT_EQ(cfg::parseAnnouncedAddressPolicy(routable, ANNOUNCED_ADDRESS_POLICY_DIALABLE),
+                    ANNOUNCED_ADDRESS_POLICY_ROUTABLE);
+}
+
+LOGOS_TEST(parse_announced_address_policy_unknown_or_missing_keeps_fallback) {
+    auto missing = json::parse(R"({})");
+    auto wrong = json::parse(R"({"announcedAddressPolicy": 3})");
+    auto unknown = json::parse(R"({"announcedAddressPolicy": "carrier-pigeon"})");
+    for (const auto& j : {missing, wrong, unknown}) {
+        LOGOS_ASSERT_EQ(cfg::parseAnnouncedAddressPolicy(j, ANNOUNCED_ADDRESS_POLICY_DIALABLE),
+                        ANNOUNCED_ADDRESS_POLICY_DIALABLE);
+    }
+}
+
+// The default is the one question this module already answers for the sets it
+// screens itself (addr_filter.h), asked once: a build whose loopback is its own
+// device announces no loopback.
+LOGOS_TEST(announced_address_policy_defaults_to_the_strictest_this_build_can_honour) {
+    const auto expected = libp2p_module::addr::publishLoopback()
+                              ? ANNOUNCED_ADDRESS_POLICY_DIALABLE
+                              : ANNOUNCED_ADDRESS_POLICY_ROUTABLE;
+    LOGOS_ASSERT_EQ(cfg::defaultAnnouncedAddressPolicy(), expected);
+    LOGOS_ASSERT_EQ(Libp2pModuleOptions{}.announcedAddressPolicy, expected);
+    // Never Unfiltered: a wildcard bind address or a port-0 placeholder in a
+    // published record is a fault on every platform this builds for.
+    LOGOS_ASSERT_FALSE(expected == ANNOUNCED_ADDRESS_POLICY_UNFILTERED);
+}
+
+LOGOS_TEST(apply_overlays_announced_address_policy) {
+    auto j = json::parse(R"({"announcedAddressPolicy": "unfiltered"})");
+    Libp2pModuleOptions opts;
+    cfg::apply(j, opts);
+    LOGOS_ASSERT_EQ(opts.announcedAddressPolicy, ANNOUNCED_ADDRESS_POLICY_UNFILTERED);
+}

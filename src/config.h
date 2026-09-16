@@ -14,6 +14,22 @@
 
 #include "utils.h"
 
+namespace libp2p_module_config {
+
+/// Which announce screen this build asks nim-libp2p for by default.
+///
+/// `Dialable` everywhere, because a wildcard bind address or a port-0
+/// placeholder is a fault on every platform. `Routable` on a device build,
+/// where loopback is the device itself: a peer reading that record can only
+/// ever reach a node inside the same app. See addr_filter.h — the same question
+/// this module already answers for the sets it screens itself, answered once.
+inline AnnouncedAddressPolicy defaultAnnouncedAddressPolicy() {
+    return libp2p_module::addr::publishLoopback() ? ANNOUNCED_ADDRESS_POLICY_DIALABLE
+                                                  : ANNOUNCED_ADDRESS_POLICY_ROUTABLE;
+}
+
+}  // namespace libp2p_module_config
+
 struct Libp2pModuleOptions {
     std::vector<std::string> addrs = {};
     std::vector<std::pair<std::string, std::vector<std::string>>> bootstrapNodes = {};
@@ -43,6 +59,13 @@ struct Libp2pModuleOptions {
     bool mountGossipsub = true;
     bool mountKad = true;
     bool mountServiceDiscovery = true;
+
+    // The screen nim-libp2p applies to the addresses this node ANNOUNCES —
+    // `peerInfo.addrs`, which is what the signed peer record, the registrar and
+    // identify all read. Defaults to the strictest screen this build can
+    // honour; see libp2p_module_config::defaultAnnouncedAddressPolicy().
+    AnnouncedAddressPolicy announcedAddressPolicy =
+        libp2p_module_config::defaultAnnouncedAddressPolicy();
 
     // Bounds on the per-topic backlog gossipsubNextMessage() drains; either at
     // 0 disables it. Keep the byte bound above gossipsubMaxMessageSize, since a
@@ -93,6 +116,21 @@ inline std::string readSource() {
     std::ostringstream ss;
     ss << f.rdbuf();
     return ss.str();
+}
+
+/// Reads the `announcedAddressPolicy` key. Like parseTransport, a value this
+/// does not know keeps the fallback rather than failing the whole config.
+inline AnnouncedAddressPolicy parseAnnouncedAddressPolicy(const nlohmann::json& j,
+                                                          AnnouncedAddressPolicy fallback) {
+    auto it = j.find("announcedAddressPolicy");
+    if (it == j.end() || !it->is_string()) {
+        return fallback;
+    }
+    const std::string v = it->get<std::string>();
+    if (v == "unfiltered") return ANNOUNCED_ADDRESS_POLICY_UNFILTERED;
+    if (v == "dialable") return ANNOUNCED_ADDRESS_POLICY_DIALABLE;
+    if (v == "routable") return ANNOUNCED_ADDRESS_POLICY_ROUTABLE;
+    return fallback;
 }
 
 inline TransportType parseTransport(const nlohmann::json& j, TransportType fallback) {
@@ -172,6 +210,7 @@ inline void apply(const nlohmann::json& j, Libp2pModuleOptions& o) {
         }
     }
     o.transport = parseTransport(j, o.transport);
+    o.announcedAddressPolicy = parseAnnouncedAddressPolicy(j, o.announcedAddressPolicy);
     if (auto it = j.find("privKey"); it != j.end()) {
         if (!it->is_string()) {
             throw std::invalid_argument("privKey must be a string");

@@ -126,6 +126,36 @@ a published `127.0.0.1` can only ever reach a node inside the same app. On the
 iOS simulator, which shares the Mac's loopback, it accidentally works — which is
 why this went unnoticed until an iPad run. See logos-workspace#206.
 
+## The set the node announces about itself
+
+Everything above is a set the module is handed or hands back. The node's **own**
+announced set — nim-libp2p's `peerInfo.addrs` — is different: it is built from
+every socket the switch bound, and service discovery signs it into the record it
+publishes on its own. No module call passes through it, so the only screen that
+reaches it is one nim-libp2p applies. `announcedAddressPolicy` chooses that one:
+
+| value | announced |
+|---|---|
+| `unfiltered` | every socket the switch bound |
+| `dialable` | minus the wildcard bind address and port 0 |
+| `routable` | minus loopback as well |
+
+It defaults to `routable` on an Android or physical-iOS build and `dialable`
+everywhere else — the same answer `addr_filter.h` gives for the sets the module
+screens itself. A node with nothing routable to say announces an empty set
+rather than a placeholder.
+
+Independently of that choice, addresses *learned* from other nodes — through
+identify and through the Kademlia routing table — are screened with the
+`dialable` rule before they are stored, since they arrive from nodes nobody here
+controls.
+
+This half lives in `nix/patches/announced-addresses.patch`, applied to the
+`nim-libp2p` flake input by `flake.nix` (desktop) and `nix/mobile-cbind.nix`
+(iOS, Android). `vacp2p/nim-libp2p` is not a fork this workspace can push to, so
+the patch is how a change to it is carried — the same route
+`logos-delivery-module` takes for its own nwaku patches.
+
 ---
 
 # Running a node via logoscore

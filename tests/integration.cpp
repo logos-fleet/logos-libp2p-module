@@ -386,3 +386,49 @@ LOGOS_TEST(integration_peerstore_refuses_undialable_addresses) {
     LOGOS_ASSERT_TRUE(node.stop().success);
     LOGOS_ASSERT_TRUE(other.stop().success);
 }
+
+// logos-workspace#206. The set this node ANNOUNCES is `peerInfo.addrs`, and it
+// is not one the module ever hands over: nim's service discovery signs it into
+// the record it publishes on its own, the registrar reads it, identify sends
+// it. The only screen that reaches it is the one nim-libp2p applies, which
+// `announcedAddressPolicy` chooses — so this pins that the choice arrives and
+// takes effect before `start` resolves the bound port.
+namespace {
+Libp2pModuleOptions loopbackNode(AnnouncedAddressPolicy policy) {
+    Libp2pModuleOptions o;
+    o.addrs = {"/ip4/127.0.0.1/tcp/0"};
+    o.announcedAddressPolicy = policy;
+    o.mountKad = false;
+    o.mountServiceDiscovery = false;
+    return o;
+}
+
+std::vector<std::string> announcedAddrs(AnnouncedAddressPolicy policy) {
+    Libp2pModuleImpl node(loopbackNode(policy));
+    if (!node.start().success) {
+        return {"<start failed>"};
+    }
+    auto [peerId, addrs] = getPeerInfoPair(node);
+    (void)node.stop();
+    return addrs;
+}
+}
+
+LOGOS_TEST(integration_announced_address_policy_reaches_the_switch) {
+    // Unfiltered is the previous behaviour: every socket the switch bound.
+    auto unfiltered = announcedAddrs(ANNOUNCED_ADDRESS_POLICY_UNFILTERED);
+    LOGOS_ASSERT_EQ(unfiltered.size(), size_t(1));
+    LOGOS_ASSERT_CONTAINS(unfiltered[0], "/ip4/127.0.0.1/tcp/");
+    // The bound port, not the placeholder it was asked to bind.
+    LOGOS_ASSERT_FALSE(unfiltered[0] == "/ip4/127.0.0.1/tcp/0");
+
+    // Loopback IS dialable — it reaches this host — so this screen keeps it.
+    auto dialable = announcedAddrs(ANNOUNCED_ADDRESS_POLICY_DIALABLE);
+    LOGOS_ASSERT_EQ(dialable.size(), size_t(1));
+    LOGOS_ASSERT_CONTAINS(dialable[0], "/ip4/127.0.0.1/tcp/");
+
+    // ...and announcing it is a different question: this node has nothing to
+    // say to another host, so it says nothing rather than a placeholder.
+    auto routable = announcedAddrs(ANNOUNCED_ADDRESS_POLICY_ROUTABLE);
+    LOGOS_ASSERT_TRUE(routable.empty());
+}
