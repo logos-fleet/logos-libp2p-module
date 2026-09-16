@@ -330,3 +330,59 @@ LOGOS_TEST(integration_quic_ping_round_trip) {
     LOGOS_ASSERT_TRUE(nodeA.stop().success);
     LOGOS_ASSERT_TRUE(nodeB.stop().success);
 }
+
+// logos-workspace#206: the wildcard bind address and the port-0 placeholder are
+// listen arguments that leak into published peer records. They cannot succeed
+// as destinations on any platform, so the dial surfaces refuse them here rather
+// than spending a TCP connect and a timeout per entry, per discovery round.
+LOGOS_TEST(integration_connect_refuses_undialable_addresses) {
+    Libp2pModuleImpl nodeA;
+    Libp2pModuleImpl nodeB;
+    LOGOS_ASSERT_TRUE(nodeA.start().success);
+    LOGOS_ASSERT_TRUE(nodeB.start().success);
+
+    auto [peerIdA, addrsA] = getPeerInfoPair(nodeA);
+
+    auto onlyBad = nodeB.connectPeer(peerIdA, {"/ip4/0.0.0.0/tcp/4001",
+                                               "/ip4/127.0.0.1/tcp/0"}, 500);
+    LOGOS_ASSERT_FALSE(onlyBad.success);
+    LOGOS_ASSERT_CONTAINS(onlyBad.error, "no dialable address");
+    LOGOS_ASSERT_EQ(nodeB.connectedPeers(PEER_DIRECTION_OUTBOUND).value.size(), size_t(0));
+
+    // A real address beside the placeholders still connects: only the junk goes.
+    std::vector<std::string> mixed{"/ip4/0.0.0.0/tcp/1", "/ip4/127.0.0.1/tcp/0"};
+    for (const auto& a : addrsA) mixed.push_back(a);
+    LOGOS_ASSERT_TRUE(nodeB.connectPeer(peerIdA, mixed, 500).success);
+    LOGOS_ASSERT_EQ(nodeB.connectedPeers(PEER_DIRECTION_OUTBOUND).value.size(), size_t(1));
+
+    LOGOS_ASSERT_TRUE(nodeA.stop().success);
+    LOGOS_ASSERT_TRUE(nodeB.stop().success);
+}
+
+// The peerstore is what the dialer reads on every later round, so a placeholder
+// stored there is dialled for as long as the entry lives.
+LOGOS_TEST(integration_peerstore_refuses_undialable_addresses) {
+    Libp2pModuleImpl node;
+    LOGOS_ASSERT_TRUE(node.start().success);
+
+    Libp2pModuleImpl other;
+    LOGOS_ASSERT_TRUE(other.start().success);
+    auto [otherId, otherAddrs] = getPeerInfoPair(other);
+
+    auto added = node.peerstoreAddPeer(otherId, {"/ip4/0.0.0.0/tcp/4001"}, {});
+    LOGOS_ASSERT_FALSE(added.success);
+    LOGOS_ASSERT_CONTAINS(added.error, "no dialable address");
+
+    std::vector<std::string> mixed{"/ip4/0.0.0.0/tcp/4001"};
+    for (const auto& a : otherAddrs) mixed.push_back(a);
+    LOGOS_ASSERT_TRUE(node.peerstoreAddPeer(otherId, mixed, {}).success);
+
+    auto stored = node.peerstoreGetPeerInfo(otherId);
+    LOGOS_ASSERT_TRUE(stored.success);
+    for (const auto& a : stored.value["addrs"]) {
+        LOGOS_ASSERT_TRUE(a.get<std::string>().find("/ip4/0.0.0.0/") == std::string::npos);
+    }
+
+    LOGOS_ASSERT_TRUE(node.stop().success);
+    LOGOS_ASSERT_TRUE(other.stop().success);
+}

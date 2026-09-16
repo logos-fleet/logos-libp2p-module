@@ -14,7 +14,7 @@
     # only that line has them yet. A builder without them simply publishes no
     # mobile keys in `packages`, so pointing this back at logos-co degrades the
     # flake rather than breaking it.
-    logos-module-builder.url = "github:logos-fleet/logos-module-builder/8eba493";
+    logos-module-builder.url = "github:logos-fleet/logos-module-builder/738f1a6ef5a6f755f8433297ac0d2ef54bba8d2f";
     libp2p.url = "github:vacp2p/nim-libp2p/master";
 
     openmetrics-module = {

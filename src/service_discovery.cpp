@@ -87,16 +87,37 @@ StdLogosResult Libp2pModuleImpl::discoRandomLookup() {
 }
 
 /// Builds and signs the node's own Extended Peer Record, returning the signed
-/// protobuf bytes. Empty `addrs` uses the listen addresses; `seqNo` 0 uses now.
-/// `services` maps a service id to its advertised payload, which is arbitrary
-/// bytes: it is carried as `bstr` and reaches the record byte for byte, with no
-/// UTF-8 round-trip in between.
+/// protobuf bytes. Empty `addrs` uses the node's bound listen addresses;
+/// `seqNo` 0 uses now. `services` maps a service id to its advertised payload,
+/// which is arbitrary bytes: it is carried as `bstr` and reaches the record
+/// byte for byte, with no UTF-8 round-trip in between.
+///
+/// THE ADDRESS SET IS SCREENED before it is signed — see addr_filter.h and
+/// logos-workspace#206. This record crosses the network and other nodes dial
+/// what it says, so a wildcard bind address or a port-0 placeholder in it is
+/// pure waste for every reader, and on a device build so is loopback. An empty
+/// `addrs` is resolved HERE rather than left to the libp2p side, because that
+/// fallback is exactly where the loopback entry comes from: it publishes every
+/// socket the switch bound.
 StdLogosResult Libp2pModuleImpl::createXpr(
     const std::vector<std::string>& addrs,
     const std::map<std::string, std::vector<uint8_t>>& services,
     uint64_t seqNo)
 {
-    auto addrsFfi = toNimFfiStrs(addrs);
+    std::vector<std::string> requested = addrs;
+    if (requested.empty()) {
+        auto info = peerInfo();
+        if (!info.success) return info;
+        for (const auto& a : info.value.value("addrs", json::array())) {
+            if (a.is_string()) requested.push_back(a.get<std::string>());
+        }
+    }
+
+    std::vector<std::string> screened;
+    StdLogosResult screenErr;
+    if (!screenPublishAddrs("createXpr", requested, screened, screenErr)) return screenErr;
+
+    auto addrsFfi = toNimFfiStrs(screened);
 
     std::vector<ServiceInfoEntry> serviceEntries;
     serviceEntries.reserve(services.size());

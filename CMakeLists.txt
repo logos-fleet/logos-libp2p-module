@@ -29,6 +29,8 @@ logos_module(
     NAME libp2p_module
     SOURCES
         src/plugin.h
+        src/addr_filter.h
+        src/addr_filter.cpp
         src/utils.h
         src/utils.cpp
         src/topic_queues.h
