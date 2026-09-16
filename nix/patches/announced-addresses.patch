@@ -1,0 +1,161 @@
+diff --git a/cbind/libp2p.nim b/cbind/libp2p.nim
+index 7774e36..69758e5 100644
+--- a/cbind/libp2p.nim
++++ b/cbind/libp2p.nim
+@@ -17,6 +17,7 @@ import ../libp2p
+ import ../libp2p/logging
+ import ../libp2p/services/natservice
+ import ../libp2p/[multiaddress, peerid]
++import ../libp2p/peeraddrpolicy
+ import ../libp2p/crypto/crypto
+ import ../libp2p/nameresolving/dnsresolver
+ import ../libp2p/protocols/pubsub/gossipsub
+@@ -280,8 +281,15 @@ proc mountGossipsub(lib: LibP2P, cfg: ParsedGossipsub): Result[void, string] =
+ 
+ proc defaultKadConfig(): KadDHTConfig =
+   # Validator/selector are host callbacks that can't cross the FFI boundary; use the defaults.
++  #
++  # `dialableAddressPolicy` is NOT configurable and NOT the announce policy: it
++  # screens the addresses this node learns from OTHER nodes, whose records we do
++  # not control, and it rejects only what no host anywhere could dial
++  # (logos-workspace#206). Loopback stays admissible — it reaches this host.
+   KadDHTConfig.new(
+-    validator = DefaultEntryValidator(), selector = DefaultEntrySelector()
++    validator = DefaultEntryValidator(),
++    selector = DefaultEntrySelector(),
++    addressPolicy = dialableAddressPolicy,
+   )
+ 
+ proc mountKad(
+@@ -391,6 +399,14 @@ proc createLibp2pNode(config: Libp2pConfig): Result[LibP2P, string] =
+     except LPError as e:
+       return err("could not create libp2p node: " & e.msg)
+ 
++  # The announced set is `peerInfo.addrs`: everything that publishes this node —
++  # the signed peer record service discovery builds, the registrar, identify —
++  # reads it after `peerInfo.update()` has run the mapper chain through this
++  # policy. Set before `start`, which is where that first update happens.
++  switch.peerInfo.addressPolicy = cfg.announcedAddressPolicy
++  # And the same screen as the Kad one, for addresses identify brings in.
++  switch.peerStore.addressPolicy = dialableAddressPolicy
++
+   let lib = LibP2P(
+     switch: switch, rng: rng, relayClient: relayClientOpt, streams: StreamRegistry()
+   )
+diff --git a/cbind/libp2p/config.nim b/cbind/libp2p/config.nim
+index 80151b0..9e3b36e 100644
+--- a/cbind/libp2p/config.nim
++++ b/cbind/libp2p/config.nim
+@@ -24,6 +24,17 @@ type MuxerType {.ffi.} = enum
+   Mplex = "mplex"
+   Yamux = "yamux"
+ 
++type AnnouncedAddressPolicy {.ffi.} = enum
++  ## What a node is allowed to tell other nodes about itself. See
++  ## logos-workspace#206: the announced set is built from every socket the
++  ## switch bound, so without a screen it carries listen-side values that no
++  ## reader can dial.
++  Unfiltered = "unfiltered" ## Announce the mapper chain's output as it is.
++  Dialable = "dialable" ## Drop the unspecified host and port 0.
++  Routable = "routable"
++    ## Drop loopback as well: on a physical device it reaches nothing but the
++    ## same app, and every reader of the record pays a connect for it.
++
+ type BootstrapNode {.ffi.} = object
+   peerId: string
+   multiaddrs: seq[string]
+@@ -46,6 +57,9 @@ type Libp2pConfig {.ffi.} = object
+   gossipsub: GossipsubConfig ## Mounting and ingress limits for GossipSub.
+   mountKad: bool ## Mount the Kademlia DHT service.
+   mountServiceDiscovery: bool ## Mount random-find based service discovery.
++  announcedAddressPolicy: AnnouncedAddressPolicy
++    ## Screen applied to the addresses this node announces; `Unfiltered` is the
++    ## zero value and keeps the previous behaviour.
+   dnsResolver: string ## DNS server address; empty uses the core defaults.
+   addrs: seq[string] ## Listen multiaddresses for the switch.
+   muxer: MuxerType ## Type of muxer used for TCP transports.
+@@ -120,6 +134,7 @@ type ParsedConfig = object
+   gossipsub: ParsedGossipsub
+   mountKad: bool
+   mountServiceDiscovery: bool
++  announcedAddressPolicy: PeerAddressPolicy
+ 
+ proc parseMultiaddrs(raw: openArray[string]): Result[seq[MultiAddress], string] =
+   var addrs: seq[MultiAddress]
+@@ -373,6 +388,13 @@ proc parseNATConfig(config: Libp2pConfig): Result[Opt[NATConfig], string] =
+   else:
+     ok(Opt.some(nat))
+ 
++proc parseAnnouncedAddressPolicy(policy: AnnouncedAddressPolicy): PeerAddressPolicy =
++  ## The `PeerAddressPolicy` `peerInfo` applies to the mapper chain's output.
++  case policy
++  of AnnouncedAddressPolicy.Unfiltered: defaultAddressPolicy
++  of AnnouncedAddressPolicy.Dialable: dialableAddressPolicy
++  of AnnouncedAddressPolicy.Routable: routableAddressPolicy
++
+ proc parse(config: Libp2pConfig): Result[ParsedConfig, string] =
+   ok(
+     ParsedConfig(
+@@ -393,5 +415,6 @@ proc parse(config: Libp2pConfig): Result[ParsedConfig, string] =
+       gossipsub: ?parseGossipsub(config.gossipsub),
+       mountKad: config.mountKad,
+       mountServiceDiscovery: config.mountServiceDiscovery,
++      announcedAddressPolicy: parseAnnouncedAddressPolicy(config.announcedAddressPolicy),
+     )
+   )
+diff --git a/libp2p/peeraddrpolicy.nim b/libp2p/peeraddrpolicy.nim
+index 740cfc0..8aaa9b5 100644
+--- a/libp2p/peeraddrpolicy.nim
++++ b/libp2p/peeraddrpolicy.nim
+@@ -34,3 +34,51 @@ const noPrivateAddressPolicy* = proc(ma: MultiAddress): bool {.gcsafe, raises: [
+   ## neither public, circuit-relay or loopback
+ 
+   isCircuitRelayMA(ma) or isPublicMA(ma) or isLoopbackMA(ma)
++
++# ── addresses that are invalid by construction ──────────────────────────────
++# See logos-workspace#206. A peer record that crosses the network may carry
++# *listen*-side values — the wildcard bind address and the pre-bind port
++# placeholder — that no host anywhere can dial. Each one costs every reader a
++# TCP connect and a timeout, on every discovery round.
++#
++# Both rules go through `initTAddress`, so an address that is not a wire one —
++# a circuit-relay hop, a DNS name — is never condemned by them.
++
++proc isUnspecifiedMA*(ma: MultiAddress): bool =
++  ## True for the wildcard bind address (`0.0.0.0`, `::`), which names no host.
++  let ta = initTAddress(ma).valueOr:
++    return false
++
++  case ta.family
++  of AddressFamily.IPv4:
++    ta.address_v4 == AnyAddress.address_v4
++  of AddressFamily.IPv6:
++    ta.address_v6 == AnyAddress6.address_v6
++  else:
++    false
++
++proc hasZeroPortMA*(ma: MultiAddress): bool =
++  ## True for `/tcp/0` and `/udp/0` — "bind me any free port", never a destination.
++  let ta = initTAddress(ma).valueOr:
++    return false
++
++  ta.port == Port(0)
++
++proc isDialableMA*(ma: MultiAddress): bool =
++  ## Loopback passes: it is dialable, it just reaches this host and no other.
++  not (ma.isUnspecifiedMA() or ma.hasZeroPortMA())
++
++proc isRoutableMA*(ma: MultiAddress): bool =
++  ma.isDialableMA() and not ma.isLoopbackMA()
++
++const dialableAddressPolicy* = proc(ma: MultiAddress): bool {.gcsafe, raises: [].} =
++  ## Drops only what cannot be dialled from any host: unspecified host, port 0.
++
++  isDialableMA(ma)
++
++const routableAddressPolicy* = proc(ma: MultiAddress): bool {.gcsafe, raises: [].} =
++  ## `dialableAddressPolicy`, and loopback too. A record carrying loopback
++  ## reaches whichever host reads it, which is never the one that published it;
++  ## on a physical device it can only ever be a node inside the same app.
++
++  isRoutableMA(ma)

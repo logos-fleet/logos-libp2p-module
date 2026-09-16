@@ -37,9 +37,16 @@
         value = f system;
       }) systems);
 
+      # nim-libp2p's own source, patched. `vacp2p/nim-libp2p` is not forked under
+      # logos-fleet and the fleet PAT cannot create one, so a change to it is
+      # carried here -- the same route logos-delivery-module takes for its own
+      # nwaku patches. See nix/patches/announced-addresses.patch.
+      libp2pPatches = [ ./nix/patches/announced-addresses.patch ];
+
       libp2pInputs = {
         packages = forEachSystem (system: {
           cbind = inputs.libp2p.packages.${system}.cbind.overrideAttrs (old: {
+            patches = (old.patches or [ ]) ++ libp2pPatches;
             buildPhase = builtins.replaceStrings
               [ "--threads:on --opt:size --noMain --mm:refc --d:metrics" ]
               [ "--threads:on --opt:size --noMain --mm:refc --d:metrics -d:chronicles_runtime_filtering=on" ]
@@ -64,6 +71,7 @@
               inherit pkgs;
               inherit (nixpkgs) lib;
               libp2pSrc = inputs.libp2p;
+              patches = libp2pPatches;
               target = system;
             };
         };

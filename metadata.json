@@ -49,6 +49,7 @@
             "mountGossipsub": "bool",
             "mountKad": "bool",
             "mountServiceDiscovery": "bool",
+            "announcedAddressPolicy": "string — \"unfiltered\" | \"dialable\" | \"routable\"; screen nim-libp2p applies to the addresses this node announces. \"dialable\" drops the wildcard bind address and port 0, \"routable\" drops loopback as well. Defaults to \"routable\" on an Android or physical-iOS build (where loopback reaches nothing but the same app) and \"dialable\" everywhere else.",
             "gossipsubQueueMaxMessages": "int — messages held per topic for gossipsubNextMessage; default 1024. Once full the newest message is dropped and counted in libp2p_module_gossipsub_queue_dropped_total.",
             "gossipsubQueueMaxBytes": "int — bytes held per topic for gossipsubNextMessage; default 4194304. Both bounds apply together, and a message larger than this bound never fits, so keep it above gossipsubMaxMessageSize. Set either bound to 0 to disable the queue for consumers that only read the gossipsubMessage event.",
             "gossipsubMaxMessageSize": "int — largest GossipSub message accepted or sent, in bytes; default 0 keeps the core 1 MiB limit. The ceiling is MAX_GOSSIPSUB_MESSAGE_SIZE (67108864).",

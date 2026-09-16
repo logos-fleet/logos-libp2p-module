@@ -106,6 +106,7 @@ void Libp2pModuleImpl::applyOptions(const Libp2pModuleOptions& options) {
         options.gossipsubDisconnectPeerAboveRateLimit;
     m_libp2pConfig.mountKad = options.mountKad;
     m_libp2pConfig.mountServiceDiscovery = options.mountServiceDiscovery;
+    m_libp2pConfig.announcedAddressPolicy = options.announcedAddressPolicy;
 
     m_libp2pConfig.muxer = MUXER_TYPE_MPLEX;
     m_libp2pConfig.transport = options.transport;
