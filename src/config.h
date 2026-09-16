@@ -18,11 +18,12 @@ namespace libp2p_module_config {
 
 /// Which announce screen this build asks nim-libp2p for by default.
 ///
-/// `Dialable` everywhere, because a wildcard bind address or a port-0
-/// placeholder is a fault on every platform. `Routable` on a device build,
-/// where loopback is the device itself: a peer reading that record can only
-/// ever reach a node inside the same app. See addr_filter.h — the same question
-/// this module already answers for the sets it screens itself, answered once.
+/// Never `Unfiltered`: a wildcard bind address or a port-0 placeholder is a
+/// fault on every platform. `Routable` on a device build, where loopback is the
+/// device itself and a peer reading the record can only ever reach a node
+/// inside the same app; `Dialable` everywhere else. See addr_filter.h — the
+/// same question this module already answers for the sets it screens itself,
+/// answered once.
 inline AnnouncedAddressPolicy defaultAnnouncedAddressPolicy() {
     return libp2p_module::addr::publishLoopback() ? ANNOUNCED_ADDRESS_POLICY_DIALABLE
                                                   : ANNOUNCED_ADDRESS_POLICY_ROUTABLE;
@@ -118,6 +119,17 @@ inline std::string readSource() {
     return ss.str();
 }
 
+inline TransportType parseTransport(const nlohmann::json& j, TransportType fallback) {
+    auto it = j.find("transport");
+    if (it == j.end() || !it->is_string()) {
+        return fallback;
+    }
+    std::string t = it->get<std::string>();
+    if (t == "tcp") return TRANSPORT_TYPE_TCP;
+    if (t == "quic" || t == "quic-v1") return TRANSPORT_TYPE_QUIC;
+    return fallback;
+}
+
 /// Reads the `announcedAddressPolicy` key. Like parseTransport, a value this
 /// does not know keeps the fallback rather than failing the whole config.
 inline AnnouncedAddressPolicy parseAnnouncedAddressPolicy(const nlohmann::json& j,
@@ -130,17 +142,6 @@ inline AnnouncedAddressPolicy parseAnnouncedAddressPolicy(const nlohmann::json& 
     if (v == "unfiltered") return ANNOUNCED_ADDRESS_POLICY_UNFILTERED;
     if (v == "dialable") return ANNOUNCED_ADDRESS_POLICY_DIALABLE;
     if (v == "routable") return ANNOUNCED_ADDRESS_POLICY_ROUTABLE;
-    return fallback;
-}
-
-inline TransportType parseTransport(const nlohmann::json& j, TransportType fallback) {
-    auto it = j.find("transport");
-    if (it == j.end() || !it->is_string()) {
-        return fallback;
-    }
-    std::string t = it->get<std::string>();
-    if (t == "tcp") return TRANSPORT_TYPE_TCP;
-    if (t == "quic" || t == "quic-v1") return TRANSPORT_TYPE_QUIC;
     return fallback;
 }
 
