@@ -145,7 +145,7 @@ LOGOS_TEST(filter_of_an_empty_list_is_empty) {
 LOGOS_TEST(publish_policy_matches_the_build) {
 #if defined(__ANDROID__)
     LOGOS_ASSERT_FALSE(addr::publishLoopback());
-#elif defined(__APPLE__) && defined(LIBP2P_MODULE_IOS_DEVICE)
+#elif defined(LIBP2P_MODULE_IOS_DEVICE)
     LOGOS_ASSERT_FALSE(addr::publishLoopback());
 #else
     // Desktop and the iOS simulator: a peer on this host does answer loopback.

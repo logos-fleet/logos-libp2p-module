@@ -80,14 +80,10 @@ bool parseIp6(sv s, std::array<uint16_t, 8>& out) {
     size_t nHead = 0, nTail = 0;
     bool afterGap = false;
 
-    if (size_t gap = s.find("::"); gap != sv::npos) {
-        if (s.find("::", gap + 2) != sv::npos) return false;  // only one run
-    }
-
     size_t i = 0;
     while (i < s.size()) {
         if (s.compare(i, 2, "::") == 0) {
-            if (afterGap) return false;
+            if (afterGap) return false;  // only one "::" run
             afterGap = true;
             i += 2;
             continue;
@@ -173,7 +169,7 @@ bool publishLoopback() {
 
 Verdict classify(const std::string& multiaddr, bool allowLoopback) {
     const auto parts = segments(multiaddr);
-    Verdict host = Verdict::Ok;
+    bool loopbackHost = false;
 
     for (size_t i = 0; i < parts.size(); ++i) {
         const sv proto = parts[i];
@@ -185,7 +181,7 @@ Verdict classify(const std::string& multiaddr, bool allowLoopback) {
             std::array<uint8_t, 4> v{};
             if (!parseIp4(value, v)) continue;
             if (v[0] == 0 && v[1] == 0 && v[2] == 0 && v[3] == 0) return Verdict::Wildcard;
-            if (v[0] == 127) host = Verdict::Loopback;
+            if (v[0] == 127) loopbackHost = true;
         } else if (proto == "ip6") {
             std::array<uint16_t, 8> g{};
             if (!parseIp6(value, g)) continue;
@@ -195,7 +191,7 @@ Verdict classify(const std::string& multiaddr, bool allowLoopback) {
                 if (g[k] != (k == 7 ? 1 : 0)) loopback = false;
             }
             if (allZero) return Verdict::Wildcard;
-            if (loopback) host = Verdict::Loopback;
+            if (loopback) loopbackHost = true;
         } else if (proto == "tcp" || proto == "udp" || proto == "sctp") {
             // Port 0 outranks loopback: it is invalid on every platform, while
             // loopback is only a publish-side fault.
@@ -203,7 +199,7 @@ Verdict classify(const std::string& multiaddr, bool allowLoopback) {
         }
     }
 
-    if (host == Verdict::Loopback && !allowLoopback) return Verdict::Loopback;
+    if (loopbackHost && !allowLoopback) return Verdict::Loopback;
     return Verdict::Ok;
 }
 

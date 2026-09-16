@@ -174,14 +174,38 @@ inline StdLogosResult jsonResult(const SyncResult& r, nlohmann::json emptyDefaul
 inline bool screenDialAddrs(const char* what,
                             const std::vector<std::string>& in,
                             std::vector<std::string>& out,
-                            std::string& err) {
+                            StdLogosResult& err) {
     auto r = libp2p_module::addr::filterDialable(in);
     if (r.droppedAny()) {
         fprintf(stderr, "libp2p_module: %s: dropped un-dialable address(es): %s\n",
                 what, r.droppedSummary().c_str());
     }
     if (!in.empty() && r.kept.empty()) {
-        err = std::string(what) + ": no dialable address supplied: " + r.droppedSummary();
+        err = {false, {},
+               std::string(what) + ": no dialable address supplied: " + r.droppedSummary()};
+        return false;
+    }
+    out = std::move(r.kept);
+    return true;
+}
+
+// The same, one step stricter, for a set on its way INTO a signed peer record
+// that other nodes read and dial: on a device build loopback goes too, since
+// there it names the device itself. Emptied the same way, and refused for the
+// same reason — to the record signer an empty list means "publish every socket
+// the switch bound", which is where the loopback entry came from.
+inline bool screenPublishAddrs(const char* what,
+                               const std::vector<std::string>& in,
+                               std::vector<std::string>& out,
+                               StdLogosResult& err) {
+    auto r = libp2p_module::addr::filterPublishable(in);
+    if (r.droppedAny()) {
+        fprintf(stderr, "libp2p_module: %s: dropped unpublishable address(es): %s\n",
+                what, r.droppedSummary().c_str());
+    }
+    if (!in.empty() && r.kept.empty()) {
+        err = {false, {}, std::string(what) + ": no publishable address — this node is not "
+                          "reachable from another host: " + r.droppedSummary()};
         return false;
     }
     out = std::move(r.kept);

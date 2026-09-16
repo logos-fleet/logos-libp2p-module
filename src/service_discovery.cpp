@@ -113,18 +113,11 @@ StdLogosResult Libp2pModuleImpl::createXpr(
         }
     }
 
-    auto screened = libp2p_module::addr::filterPublishable(requested);
-    if (screened.droppedAny()) {
-        fprintf(stderr, "libp2p_module: createXpr: dropped unpublishable address(es): %s\n",
-                screened.droppedSummary().c_str());
-    }
-    if (!requested.empty() && screened.kept.empty()) {
-        return {false, {},
-                "createXpr: no publishable address — this node is not reachable from "
-                "another host: " + screened.droppedSummary()};
-    }
+    std::vector<std::string> screened;
+    StdLogosResult screenErr;
+    if (!screenPublishAddrs("createXpr", requested, screened, screenErr)) return screenErr;
 
-    auto addrsFfi = toNimFfiStrs(screened.kept);
+    auto addrsFfi = toNimFfiStrs(screened);
 
     std::vector<ServiceInfoEntry> serviceEntries;
     serviceEntries.reserve(services.size());

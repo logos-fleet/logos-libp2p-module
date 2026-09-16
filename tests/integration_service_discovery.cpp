@@ -338,5 +338,17 @@ LOGOS_TEST(create_xpr_screens_the_published_address_set) {
     LOGOS_ASSERT_FALSE(none.success);
     LOGOS_ASSERT_CONTAINS(none.error, "no publishable address");
 
+    // An empty `addrs` resolves to the node's own bound addresses HERE, and they
+    // are screened like any other set — that resolution is the whole point, so
+    // it must not hand libp2p an empty list and let it publish every socket.
+    auto fromNode = node.createXpr({}, {}, 7);
+    LOGOS_ASSERT_TRUE(fromNode.success);
+    auto decodedOwn = node.decodeXpr(fromNode.value.get<std::string>());
+    LOGOS_ASSERT_TRUE(decodedOwn.success);
+    LOGOS_ASSERT_FALSE(decodedOwn.value["addrs"].empty());
+    for (const auto& a : decodedOwn.value["addrs"]) {
+        LOGOS_ASSERT_TRUE(libp2p_module::addr::publishable(a.get<std::string>()));
+    }
+
     LOGOS_ASSERT_TRUE(node.stop().success);
 }

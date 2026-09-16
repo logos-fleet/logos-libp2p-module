@@ -114,7 +114,7 @@ void Libp2pModuleImpl::cbRecords(int ec, const ExtendedRecordsResponse* reply, c
     if (r.ok && reply && reply->records.data) {
         json arr = json::array();
         for (size_t i = 0; i < reply->records.len; ++i) {
-            arr.push_back(recordEntryToJson(reply->records.data[i], true));
+            arr.push_back(recordEntryToJson(reply->records.data[i], /*screenAddrs=*/true));
         }
         r.data = std::move(arr);
     }
@@ -123,7 +123,7 @@ void Libp2pModuleImpl::cbRecords(int ec, const ExtendedRecordsResponse* reply, c
 
 void Libp2pModuleImpl::cbRecord(int ec, const ExtendedPeerRecordEntry* reply, const char* em, void* ud) {
     auto r = replyBase(ec, em);
-    if (r.ok && reply) r.data = recordEntryToJson(*reply, false);
+    if (r.ok && reply) r.data = recordEntryToJson(*reply, /*screenAddrs=*/false);
     finishPromise(static_cast<SyncPromise*>(ud), std::move(r));
 }
 

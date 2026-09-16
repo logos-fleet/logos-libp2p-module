@@ -27,10 +27,8 @@ StdLogosResult Libp2pModuleImpl::peerstoreAddPeer(
     // The peerstore is what the dialer reads, so an un-dialable address stored
     // here is dialled on every later round. Screen it at the door.
     std::vector<std::string> screened;
-    std::string screenErr;
-    if (!screenDialAddrs("peerstoreAddPeer", addrs, screened, screenErr)) {
-        return {false, {}, screenErr};
-    }
+    StdLogosResult screenErr;
+    if (!screenDialAddrs("peerstoreAddPeer", addrs, screened, screenErr)) return screenErr;
     auto addrsFfi = toNimFfiStrs(screened);
     auto protosFfi = toNimFfiStrs(protos);
 
@@ -49,10 +47,8 @@ StdLogosResult Libp2pModuleImpl::peerstoreSetPeerAddresses(
     const std::vector<std::string>& addrs)
 {
     std::vector<std::string> screened;
-    std::string screenErr;
-    if (!screenDialAddrs("peerstoreSetPeerAddresses", addrs, screened, screenErr)) {
-        return {false, {}, screenErr};
-    }
+    StdLogosResult screenErr;
+    if (!screenDialAddrs("peerstoreSetPeerAddresses", addrs, screened, screenErr)) return screenErr;
     auto addrsFfi = toNimFfiStrs(screened);
 
     SetAddressesRequest req{};

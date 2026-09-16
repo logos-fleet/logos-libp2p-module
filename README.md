@@ -105,10 +105,12 @@ module refuses them without a network round trip. See `src/addr_filter.h`.
 *listen* argument and stays one. The screening applies to addresses that cross
 the network:
 
-- `connectPeer`, `circuitRelayReserve`, `dialCircuitRelay`, `peerstoreAddPeer`,
+- `connectPeer`, `circuitRelayReserve`, `peerstoreAddPeer` and
   `peerstoreSetPeerAddresses` drop un-dialable entries and fail with
   `no dialable address` if that was all the caller supplied. An empty list keeps
-  its old meaning ("use the peerstore").
+  its old meaning ("use the peerstore"). `dialCircuitRelay` takes a single
+  address, so it is all-or-nothing: an un-dialable one fails with
+  `un-dialable relay address <addr> (<reason>)`.
 - `createXpr` screens the set it signs, and resolves an empty `addrs` to the
   node's bound addresses *here* rather than letting libp2p fall back to every
   socket the switch bound — which is where the loopback entry came from.
