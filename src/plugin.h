@@ -30,6 +30,7 @@
 // take C linkage and no longer match the C++ static callbacks we pass in.
 #include <libp2p.h>
 
+#include "addr_filter.h"
 #include "config.h"
 #include "metric.h"
 #include "stream_queues.h"
@@ -162,6 +163,29 @@ inline int awaitTimeoutFor(int64_t opTimeoutMs) {
 inline StdLogosResult jsonResult(const SyncResult& r, nlohmann::json emptyDefault) {
     if (r.data.is_null()) return {true, std::move(emptyDefault), ""};
     return {true, r.data, ""};
+}
+
+// Screens an address list on its way OUT to the libp2p dialer. Entries that can
+// never be a destination — the wildcard bind address, port 0 — are dropped here
+// rather than costing a TCP connect and a timeout each; see addr_filter.h and
+// logos-workspace#206. An input that was non-empty and is now empty is refused
+// instead of forwarded, because an empty list means "use the peerstore" on the
+// libp2p side and the caller did not ask for that. `what` names the call.
+inline bool screenDialAddrs(const char* what,
+                            const std::vector<std::string>& in,
+                            std::vector<std::string>& out,
+                            std::string& err) {
+    auto r = libp2p_module::addr::filterDialable(in);
+    if (r.droppedAny()) {
+        fprintf(stderr, "libp2p_module: %s: dropped un-dialable address(es): %s\n",
+                what, r.droppedSummary().c_str());
+    }
+    if (!in.empty() && r.kept.empty()) {
+        err = std::string(what) + ": no dialable address supplied: " + r.droppedSummary();
+        return false;
+    }
+    out = std::move(r.kept);
+    return true;
 }
 
 // Defined below the class. A forward declaration of the module class above it makes the codegen header parser read that declaration as the class body and publish no methods at all.

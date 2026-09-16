@@ -10,6 +10,8 @@
 
 #include <libp2p.h>
 
+#include "addr_filter.h"
+
 // Copies a borrowed NimFfiStr into an owned std::string (empty on null data).
 // Response strings are only valid during the callback, so they must be copied.
 inline std::string nfStr(const NimFfiStr& s) {
@@ -48,6 +50,23 @@ inline nlohmann::json seqStrToJson(const LibP2PSeq_Str& seq) {
     if (!seq.data) return out;
     for (size_t i = 0; i < seq.len; ++i) {
         out.push_back(nfStr(seq.data[i]));
+    }
+    return out;
+}
+
+// Same, for an address sequence that arrived FROM another node and is on its
+// way to a caller that will dial it. Entries that can never be a destination
+// (wildcard host, port 0) are dropped here: peer records come from nodes we do
+// not control, and each such entry costs a TCP connect and a timeout on a
+// battery-powered device, every discovery round. Loopback is kept — it is
+// dialable, and two nodes on one host legitimately use it. See addr_filter.h
+// and logos-workspace#206.
+inline nlohmann::json seqDialableAddrsToJson(const LibP2PSeq_Str& seq) {
+    nlohmann::json out = nlohmann::json::array();
+    if (!seq.data) return out;
+    for (size_t i = 0; i < seq.len; ++i) {
+        auto addr = nfStr(seq.data[i]);
+        if (libp2p_module::addr::dialable(addr)) out.push_back(std::move(addr));
     }
     return out;
 }

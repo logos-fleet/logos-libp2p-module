@@ -90,6 +90,42 @@ increments `libp2p_gossipsub_peers_rate_limit_hits`; set the flag to enforce it.
 
 ---
 
+# Address screening
+
+Some multiaddresses are invalid *by construction* as a destination, and the
+module refuses them without a network round trip. See `src/addr_filter.h`.
+
+| class | example | dial | publish |
+|---|---|---|---|
+| wildcard bind address | `/ip4/0.0.0.0/tcp/53924`, `/ip6/::/tcp/4001` | rejected | rejected |
+| port-0 placeholder | `/ip4/192.168.1.158/tcp/0` | rejected | rejected |
+| loopback | `/ip4/127.0.0.1/tcp/53022` | allowed | desktop and the iOS simulator only |
+
+`addrs` in the **config** is untouched: `/ip4/0.0.0.0/tcp/0` is a perfectly good
+*listen* argument and stays one. The screening applies to addresses that cross
+the network:
+
+- `connectPeer`, `circuitRelayReserve`, `dialCircuitRelay`, `peerstoreAddPeer`,
+  `peerstoreSetPeerAddresses` drop un-dialable entries and fail with
+  `no dialable address` if that was all the caller supplied. An empty list keeps
+  its old meaning ("use the peerstore").
+- `createXpr` screens the set it signs, and resolves an empty `addrs` to the
+  node's bound addresses *here* rather than letting libp2p fall back to every
+  socket the switch bound — which is where the loopback entry came from.
+  Un-publishable throughout fails with `no publishable address`.
+- Peer records arriving from other nodes (`discoLookup`, `discoRandomLookup`,
+  `kadGetRandomRecords`, `kadGetProviders`, `peerstoreGetPeerInfo`,
+  `circuitRelayReserve`'s reply) come back with the un-dialable entries removed,
+  since they arrive from nodes nobody here controls. `decodeXpr` is left
+  faithful: it is an inspector and reports what the record actually says.
+
+On a physical device this matters most: loopback there is the device itself, so
+a published `127.0.0.1` can only ever reach a node inside the same app. On the
+iOS simulator, which shares the Mac's loopback, it accidentally works — which is
+why this went unnoticed until an iPad run. See logos-workspace#206.
+
+---
+
 # Running a node via logoscore
 
 The module can be driven directly from `logoscore` without any other module. A

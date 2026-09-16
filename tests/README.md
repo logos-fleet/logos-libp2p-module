@@ -4,9 +4,10 @@ This directory contains Qt-based tests for the `logos-libp2p-module`.
 
 Tests come in two layers:
 
-- **Fast unit layer** (`libp2p_module_unit_tests`) — `unit_config.cpp`,
-  `unit_metrics.cpp`, `unit_sync.cpp`. Exercise only header-inline logic
-  (config parsing, `Metric` JSON, the await/parse primitives), construct no
+- **Fast unit layer** (`libp2p_module_unit_tests`) — `unit_addr_filter.cpp`,
+  `unit_config.cpp`, `unit_metrics.cpp`, `unit_sync.cpp`. Exercise only header-inline logic
+  (config parsing, address screening, `Metric` JSON, the await/parse
+  primitives), construct no
   `Libp2pModuleImpl`, and link without the libp2p library, so they always build
   and run.
 - **Integration layer** (`libp2p_module_tests`), everything that drives a real

@@ -385,7 +385,12 @@ StdLogosResult Libp2pModuleImpl::connectPeer(
     const std::vector<std::string>& multiaddrs,
     int64_t timeoutMs)
 {
-    auto addrsFfi = toNimFfiStrs(multiaddrs);
+    std::vector<std::string> screened;
+    std::string screenErr;
+    if (!screenDialAddrs("connectPeer", multiaddrs, screened, screenErr)) {
+        return {false, {}, screenErr};
+    }
+    auto addrsFfi = toNimFfiStrs(screened);
 
     ConnectRequest req{};
     req.peerId = nimffi_str(peerId.c_str());
@@ -475,7 +480,12 @@ StdLogosResult Libp2pModuleImpl::circuitRelayReserve(
     const std::string& relayPeerId,
     const std::vector<std::string>& relayAddrs)
 {
-    auto addrsFfi = toNimFfiStrs(relayAddrs);
+    std::vector<std::string> screened;
+    std::string screenErr;
+    if (!screenDialAddrs("circuitRelayReserve", relayAddrs, screened, screenErr)) {
+        return {false, {}, screenErr};
+    }
+    auto addrsFfi = toNimFfiStrs(screened);
 
     CircuitRelayReserveRequest req{};
     req.relayPeerId = nimffi_str(relayPeerId.c_str());
@@ -494,6 +504,12 @@ StdLogosResult Libp2pModuleImpl::dialCircuitRelay(
     const std::string& multiaddr,
     const std::string& proto)
 {
+    if (auto v = libp2p_module::addr::classify(multiaddr, /*allowLoopback=*/true);
+        v != libp2p_module::addr::Verdict::Ok) {
+        return {false, {}, std::string("dialCircuitRelay: un-dialable relay address ") +
+                           multiaddr + " (" + libp2p_module::addr::describe(v) + ")"};
+    }
+
     DialCircuitRelayRequest req{};
     req.peerId = nimffi_str(dstPeerId.c_str());
     req.multiaddr = nimffi_str(multiaddr.c_str());

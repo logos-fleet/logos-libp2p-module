@@ -12,11 +12,16 @@ namespace {
 // repeat a service id — an object would drop all but the last. A caller
 // round-tripping a decoded record back into createXpr rebuilds the map itself,
 // base64-decoding each `data` as it goes.
-json recordEntryToJson(const ExtendedPeerRecordEntry& rec) {
+//
+// `screenAddrs` is set for records that arrived from ANOTHER node and whose
+// addresses a caller is about to dial: there the un-dialable entries are
+// dropped (see seqDialableAddrsToJson). decodeXpr leaves it clear — that call
+// is an inspector, and a record has to decode to what it actually says.
+json recordEntryToJson(const ExtendedPeerRecordEntry& rec, bool screenAddrs) {
     json out;
     out["peerId"] = nfStr(rec.peerId);
     out["seqNo"] = rec.seqNo;
-    out["addrs"] = seqStrToJson(rec.addrs);
+    out["addrs"] = screenAddrs ? seqDialableAddrsToJson(rec.addrs) : seqStrToJson(rec.addrs);
 
     json services = json::array();
     if (rec.services.data) {
@@ -35,7 +40,7 @@ json recordEntryToJson(const ExtendedPeerRecordEntry& rec) {
 json providerToJson(const ProviderInfo& p) {
     json j;
     j["peerId"] = nfStr(p.peerId);
-    j["addrs"] = seqStrToJson(p.addrs);
+    j["addrs"] = seqDialableAddrsToJson(p.addrs);
     return j;
 }
 }  // namespace
@@ -109,7 +114,7 @@ void Libp2pModuleImpl::cbRecords(int ec, const ExtendedRecordsResponse* reply, c
     if (r.ok && reply && reply->records.data) {
         json arr = json::array();
         for (size_t i = 0; i < reply->records.len; ++i) {
-            arr.push_back(recordEntryToJson(reply->records.data[i]));
+            arr.push_back(recordEntryToJson(reply->records.data[i], true));
         }
         r.data = std::move(arr);
     }
@@ -118,13 +123,14 @@ void Libp2pModuleImpl::cbRecords(int ec, const ExtendedRecordsResponse* reply, c
 
 void Libp2pModuleImpl::cbRecord(int ec, const ExtendedPeerRecordEntry* reply, const char* em, void* ud) {
     auto r = replyBase(ec, em);
-    if (r.ok && reply) r.data = recordEntryToJson(*reply);
+    if (r.ok && reply) r.data = recordEntryToJson(*reply, false);
     finishPromise(static_cast<SyncPromise*>(ud), std::move(r));
 }
 
 void Libp2pModuleImpl::cbReservation(int ec, const ReservationResponse* reply, const char* em, void* ud) {
     auto r = replyBase(ec, em);
-    if (r.ok && reply) r.data = seqStrToJson(reply->addrs);
+    // Relay addresses a remote relay handed back, which the caller dials next.
+    if (r.ok && reply) r.data = seqDialableAddrsToJson(reply->addrs);
     finishPromise(static_cast<SyncPromise*>(ud), std::move(r));
 }
 
@@ -135,7 +141,7 @@ void Libp2pModuleImpl::cbPeerStoreEntry(
     if (r.ok && reply) {
         json j;
         j["peerId"] = nfStr(reply->peerId);
-        j["addrs"] = seqStrToJson(reply->addrs);
+        j["addrs"] = seqDialableAddrsToJson(reply->addrs);
         j["protocols"] = seqStrToJson(reply->protocols);
         auto pk = nfBytes(reply->publicKey);
         j["publicKey"] = hexEncode(pk.data(), pk.size());

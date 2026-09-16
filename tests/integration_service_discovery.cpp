@@ -307,3 +307,36 @@ LOGOS_TEST(decode_xpr) {
 
     LOGOS_ASSERT_TRUE(node.stop().success);
 }
+
+// logos-workspace#206: the record crosses the network and other nodes dial what
+// it says, so the wildcard bind address and the port-0 placeholder must not be
+// in it. decodeXpr is left faithful — it is an inspector — so it is what proves
+// the signed bytes no longer carry them.
+LOGOS_TEST(create_xpr_screens_the_published_address_set) {
+    Libp2pModuleImpl node(discoOptions());
+    LOGOS_ASSERT_TRUE(node.start().success);
+
+    auto [peerId, addrs] = getPeerInfoPair(node);
+    LOGOS_ASSERT_FALSE(addrs.empty());
+
+    std::vector<std::string> requested{"/ip4/0.0.0.0/tcp/63706", "/ip4/10.1.2.3/tcp/0"};
+    for (const auto& a : addrs) requested.push_back(a);
+
+    auto created = node.createXpr(requested, {}, 7);
+    LOGOS_ASSERT_TRUE(created.success);
+
+    auto decoded = node.decodeXpr(created.value.get<std::string>());
+    LOGOS_ASSERT_TRUE(decoded.success);
+    // Exactly the node's own bound addresses survive; both placeholders are gone.
+    LOGOS_ASSERT_EQ(decoded.value["addrs"].size(), addrs.size());
+    for (size_t i = 0; i < addrs.size(); ++i) {
+        LOGOS_ASSERT_EQ(decoded.value["addrs"][i].get<std::string>(), addrs[i]);
+    }
+
+    // Every supplied address un-publishable is refused, not signed empty.
+    auto none = node.createXpr({"/ip4/0.0.0.0/tcp/0"}, {}, 7);
+    LOGOS_ASSERT_FALSE(none.success);
+    LOGOS_ASSERT_CONTAINS(none.error, "no publishable address");
+
+    LOGOS_ASSERT_TRUE(node.stop().success);
+}

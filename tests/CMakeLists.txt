@@ -10,11 +10,13 @@ include(LogosTest)
 logos_test(
     NAME libp2p_module_unit_tests
     MODULE_SOURCES
+        ../src/addr_filter.cpp
         ../src/utils.cpp
         ../src/topic_queues.cpp
         ../src/stream_queues.cpp
     TEST_SOURCES
         main.cpp
+        unit_addr_filter.cpp
         unit_config.cpp
         unit_metrics.cpp
         unit_sync.cpp
@@ -42,6 +44,7 @@ if(LIBP2P_PATH)
     logos_test(
         NAME libp2p_module_tests
         MODULE_SOURCES
+            ../src/addr_filter.cpp
             ../src/utils.cpp
             ../src/topic_queues.cpp
             ../src/stream_queues.cpp
